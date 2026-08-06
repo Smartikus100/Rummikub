@@ -130,6 +130,7 @@ tfoot td:first-child { background:var(--color-surface); }
 }
 #timerDisplay.flash { color:var(--color-error); animation:flash 1s infinite; }
 @keyframes flash { 50% { opacity:.35; } }
+@keyframes flashPulse { 50% { opacity:.35; } }
 .timer-presets { display:flex; justify-content:center; gap:.5rem; flex-wrap:wrap; margin-bottom:1rem; }
 .timer-presets button {
   background:var(--color-surface-offset); color:var(--color-text); border:1px solid var(--color-border);
@@ -143,13 +144,49 @@ tfoot td:first-child { background:var(--color-surface); }
   display:flex; align-items:center; justify-content:center; letter-spacing:.02em;
 }
 #toggleTimerBtn.running { background:var(--color-error); }
-#restartTimerBtn {
+#restartTimerBtn, #pauseTimerBtn, #fsRestartTimerBtn, #fsPauseTimerBtn {
   width:90px; height:90px; border-radius:var(--radius-full); font-size:.85rem; font-weight:700;
   background:var(--color-surface-offset); color:var(--color-text); border:1px solid var(--color-border);
   box-shadow:var(--shadow-sm); display:flex; align-items:center; justify-content:center; letter-spacing:.02em;
   flex-direction:column; gap:.15rem;
 }
-#restartTimerBtn svg { width:22px; height:22px; }
+#restartTimerBtn svg, #pauseTimerBtn svg, #fsRestartTimerBtn svg, #fsPauseTimerBtn svg { width:22px; height:22px; }
+#pauseTimerBtn:disabled, #fsPauseTimerBtn:disabled { opacity:.35; }
+
+.timer-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:.5rem; }
+.timer-card-header h2 { margin:0; }
+#fullscreenTimerBtn {
+  width:40px; height:40px; border-radius:var(--radius-full); background:var(--color-surface-offset);
+  display:flex; align-items:center; justify-content:center; color:var(--color-text); border:1px solid var(--color-border);
+}
+#fullscreenTimerBtn svg { width:18px; height:18px; }
+
+.fullscreen-timer-overlay {
+  display:none; position:fixed; inset:0; z-index:9999; background:var(--color-bg);
+  flex-direction:column; align-items:center; justify-content:center; gap:2rem; padding:var(--space-8);
+}
+.fullscreen-timer-overlay.active { display:flex; }
+#fullscreenTimerDisplay {
+  font-family:var(--font-display), serif; font-weight:700; font-size:clamp(4rem, 22vw, 12rem);
+  color:var(--color-text); letter-spacing:-0.02em; font-variant-numeric:tabular-nums;
+}
+#fullscreenTimerDisplay.flash { color:var(--color-error); animation:flashPulse 1s ease-in-out infinite; }
+.fullscreen-controls { gap:1.5rem; }
+.fullscreen-controls #fsToggleTimerBtn {
+  width:140px; height:140px; border-radius:var(--radius-full); font-size:1.2rem; font-weight:700;
+  background:var(--color-primary); color:#fff; box-shadow:var(--shadow-md); border:none;
+}
+.fullscreen-controls #fsToggleTimerBtn.running { background:var(--color-error); }
+#exitFullscreenTimerBtn {
+  display:flex; align-items:center; gap:.5rem; padding:.75rem 1.5rem; border-radius:var(--radius-full);
+  background:var(--color-surface-offset); color:var(--color-text); border:1px solid var(--color-border);
+  font-weight:600; font-size:var(--text-sm);
+}
+#exitFullscreenTimerBtn svg { width:18px; height:18px; }
+
+.checkbox-field { display:flex; align-items:center; gap:.5rem; margin:.75rem 0; }
+.checkbox-field input[type="checkbox"] { width:20px; height:20px; accent-color:var(--color-primary); }
+.checkbox-field label { font-size:var(--text-sm); color:var(--color-text-muted); }
 .footer-note { text-align:center; color:var(--color-text-faint); font-size:.78rem; margin-top:1.5rem; line-height:1.6; }
 
 @media (max-width:480px) {
@@ -245,6 +282,10 @@ button, .step-btn, #toggleTimerBtn, #restartTimerBtn, .timer-presets button, sel
         <input type="number" id="targetScore" placeholder="e.g. 200">
       </div>
     </div>
+    <div class="field checkbox-field">
+      <input type="checkbox" id="keepNamesCheckbox" checked>
+      <label for="keepNamesCheckbox">Keep player names when restarting</label>
+    </div>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="setupPlayers()">Start / Reset Game</button>
     </div>
@@ -274,8 +315,13 @@ button, .step-btn, #toggleTimerBtn, #restartTimerBtn, .timer-presets button, sel
     </div>
   </section>
 
-  <section class="card timer-card">
-    <h2>Turn Timer</h2>
+  <section class="card timer-card" id="timerCard">
+    <div class="timer-card-header">
+      <h2>Turn Timer</h2>
+      <button id="fullscreenTimerBtn" onclick="enterFullscreenTimer()" aria-label="Full screen timer" title="Full screen timer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m11-5v3a2 2 0 0 1-2 2h-3"/></svg>
+      </button>
+    </div>
     <div id="timerDisplay">01:00</div>
     <div class="timer-presets">
       <button onclick="setPreset(30)">30s</button>
@@ -285,12 +331,35 @@ button, .step-btn, #toggleTimerBtn, #restartTimerBtn, .timer-presets button, sel
     </div>
     <div class="timer-btn-row">
       <button id="toggleTimerBtn" onclick="toggleTimer()">Start</button>
+      <button id="pauseTimerBtn" onclick="pauseTimer()" aria-label="Pause timer" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        Pause
+      </button>
       <button id="restartTimerBtn" onclick="restartTimer()" aria-label="Stop and restart timer">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
         Restart
       </button>
     </div>
   </section>
+
+  <div id="fullscreenTimerOverlay" class="fullscreen-timer-overlay">
+    <div id="fullscreenTimerDisplay">01:00</div>
+    <div class="timer-btn-row fullscreen-controls">
+      <button id="fsToggleTimerBtn" onclick="toggleTimer()">Start</button>
+      <button id="fsPauseTimerBtn" onclick="pauseTimer()" aria-label="Pause timer" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/></svg>
+        Pause
+      </button>
+      <button id="fsRestartTimerBtn" onclick="restartTimer()" aria-label="Stop and restart timer">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 1 1-2.64-6.36M21 3v6h-6"/></svg>
+        Restart
+      </button>
+    </div>
+    <button id="exitFullscreenTimerBtn" onclick="exitFullscreenTimer()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+      Back to Scoring
+    </button>
+  </div>
 
   <p class="footer-note">Winner scores the sum of every other player's remaining tile points. Everyone else scores negative their own leftover tiles. Tap the timer button once to start, tap again to stop and reset.</p>
 </div>
@@ -375,8 +444,19 @@ function clearSavedState() {
 
 function setupPlayers() {
   const count = parseInt(document.getElementById('playerCount').value);
-  players = [];
-  for (let i = 1; i <= count; i++) players.push({ name: 'Player ' + i });
+  const keepNames = document.getElementById('keepNamesCheckbox').checked;
+  const previousNames = players.map(p => p.name);
+  const newPlayers = [];
+  for (let i = 1; i <= count; i++) {
+    if (keepNames && previousNames[i - 1] && previousNames[i - 1].trim() !== '' && !/^Player \d+$/.test(previousNames[i - 1])) {
+      newPlayers.push({ name: previousNames[i - 1] });
+    } else if (keepNames && previousNames[i - 1]) {
+      newPlayers.push({ name: previousNames[i - 1] });
+    } else {
+      newPlayers.push({ name: 'Player ' + i });
+    }
+  }
+  players = newPlayers;
   rounds = [];
   renderRoundEntry();
   renderTable();
@@ -488,32 +568,48 @@ function submitRound() {
   renderTable();
 }
 
+function getSortedOrder() {
+  const totals = players.map((p, idx) => rounds.reduce((sum, r) => sum + r[idx], 0));
+  const order = players.map((p, idx) => idx);
+  order.sort((a, b) => totals[b] - totals[a]);
+  return { order, totals };
+}
+
 function renderTable() {
   const headerRow = document.getElementById('headerRow');
   const scoreBody = document.getElementById('scoreBody');
+  const { order, totals } = getSortedOrder();
+
   headerRow.innerHTML = '<th>Round</th>';
-  players.forEach((p, idx) => {
+  order.forEach((idx) => {
+    const p = players[idx];
     headerRow.innerHTML += `<th><input type="text" value="${p.name}" onchange="renamePlayer(${idx}, this.value)" onfocus="this.select()" onclick="this.select()"></th>`;
   });
+
   scoreBody.innerHTML = '';
   rounds.forEach((rs, r) => {
     let row = `<tr><td>${r + 1}</td>`;
-    rs.forEach(score => {
+    order.forEach((idx) => {
+      const score = rs[idx];
       const cls = score > 0 ? 'pos' : (score < 0 ? 'neg' : '');
       row += `<td class="${cls}">${score > 0 ? '+' + score : score}</td>`;
     });
     row += '</tr>';
     scoreBody.innerHTML += row;
   });
-  renderTotals();
+  renderTotals(order, totals);
 }
 
-function renderTotals() {
+function renderTotals(order, totals) {
+  if (!order || !totals) {
+    const sorted = getSortedOrder();
+    order = sorted.order;
+    totals = sorted.totals;
+  }
   const totalRow = document.getElementById('totalRow');
-  const totals = players.map((p, idx) => rounds.reduce((sum, r) => sum + r[idx], 0));
   const maxTotal = totals.length ? Math.max(...totals) : null;
   let row = '<td>Total</td>';
-  players.forEach((p, idx) => {
+  order.forEach((idx) => {
     const leaderCls = (totals[idx] === maxTotal && rounds.length > 0) ? 'leader' : '';
     const scoreCls = totals[idx] > 0 ? 'pos' : (totals[idx] < 0 ? 'neg' : '');
     row += `<td class="${leaderCls} ${scoreCls}">${totals[idx]}</td>`;
@@ -593,8 +689,27 @@ function beep(duration = 0.35, freq = 880, volume = 0.6, delay = 0) {
 
 function playGoSound() {
   try {
-    beep(0.28, 523, 0.6, 0);
-    beep(0.5, 784, 0.65, 0.3);
+    const ctx = getAudioCtx();
+    const freq = 1900;
+    const duration = 2.2;
+    const partials = [1.0, 2.76, 5.40, 8.93, 13.34];
+    const amps =     [0.55, 0.30, 0.16, 0.08, 0.04];
+    const decays =   [1.2, 1.8, 2.5, 3.2, 4.0];
+    const now = ctx.currentTime;
+    partials.forEach((p, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = freq * p;
+      const peakVol = amps[i];
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(peakVol, now + 0.008);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + duration / decays[i] * 1.4);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + duration);
+    });
   } catch (e) {}
 }
 
@@ -619,34 +734,81 @@ function formatTime(sec) {
 
 function updateTimerDisplay() {
   const display = document.getElementById('timerDisplay');
-  display.textContent = formatTime(timerSeconds);
-  display.classList.toggle('flash', timerSeconds <= 5 && timerSeconds > 0 && timerRunning);
+  const fsDisplay = document.getElementById('fullscreenTimerDisplay');
+  const text = formatTime(timerSeconds);
+  const shouldFlash = timerSeconds <= 5 && timerSeconds > 0 && timerRunning;
+  display.textContent = text;
+  display.classList.toggle('flash', shouldFlash);
+  if (fsDisplay) {
+    fsDisplay.textContent = text;
+    fsDisplay.classList.toggle('flash', shouldFlash);
+  }
+}
+
+function syncTimerButtons() {
+  const toggleBtn = document.getElementById('toggleTimerBtn');
+  const pauseBtn = document.getElementById('pauseTimerBtn');
+  const fsToggleBtn = document.getElementById('fsToggleTimerBtn');
+  const fsPauseBtn = document.getElementById('fsPauseTimerBtn');
+  const label = timerRunning ? 'Stop' : (timerPaused ? 'Resume' : 'Start');
+  if (toggleBtn) { toggleBtn.textContent = label; toggleBtn.classList.toggle('running', timerRunning); }
+  if (fsToggleBtn) { fsToggleBtn.textContent = label; fsToggleBtn.classList.toggle('running', timerRunning); }
+  if (pauseBtn) pauseBtn.disabled = !timerRunning;
+  if (fsPauseBtn) fsPauseBtn.disabled = !timerRunning;
 }
 
 function setPreset(sec) {
   baseSeconds = sec;
+  timerPaused = false;
   stopAndResetTimer();
   document.querySelectorAll('.timer-presets button').forEach(b => b.classList.remove('active'));
   event.target.classList.add('active');
 }
 
+function enterFullscreenTimer() {
+  haptic('light');
+  document.getElementById('fullscreenTimerOverlay').classList.add('active');
+  updateTimerDisplay();
+  syncTimerButtons();
+}
+
+function exitFullscreenTimer() {
+  haptic('light');
+  document.getElementById('fullscreenTimerOverlay').classList.remove('active');
+}
+
+let timerPaused = false;
+
 function toggleTimer() {
-  const btn = document.getElementById('toggleTimerBtn');
   haptic('medium');
   if (timerRunning) {
     stopAndResetTimer();
+  } else if (timerPaused) {
+    resumeTimerRun();
   } else {
     startTimerRun();
   }
 }
 
 function startTimerRun() {
-  const btn = document.getElementById('toggleTimerBtn');
   unlockAudio();
   playGoSound();
   timerRunning = true;
-  btn.textContent = 'Stop';
-  btn.classList.add('running');
+  timerPaused = false;
+  syncTimerButtons();
+  runTimerInterval();
+}
+
+function resumeTimerRun() {
+  unlockAudio();
+  timerRunning = true;
+  timerPaused = false;
+  syncTimerButtons();
+  runTimerInterval();
+}
+
+function runTimerInterval() {
+  clearInterval(timerInterval);
   timerInterval = setInterval(() => {
     if (timerSeconds > 0) {
       timerSeconds--;
@@ -655,20 +817,28 @@ function startTimerRun() {
       if (timerSeconds === 0) {
         clearInterval(timerInterval);
         timerRunning = false;
-        btn.textContent = 'Start';
-        btn.classList.remove('running');
+        timerPaused = false;
+        syncTimerButtons();
       }
     }
   }, 1000);
 }
 
+function pauseTimer() {
+  if (!timerRunning) return;
+  haptic('light');
+  clearInterval(timerInterval);
+  timerRunning = false;
+  timerPaused = true;
+  syncTimerButtons();
+}
+
 function stopAndResetTimer() {
   clearInterval(timerInterval);
   timerRunning = false;
+  timerPaused = false;
   timerSeconds = baseSeconds;
-  const btn = document.getElementById('toggleTimerBtn');
-  btn.textContent = 'Start';
-  btn.classList.remove('running');
+  syncTimerButtons();
   updateTimerDisplay();
 }
 

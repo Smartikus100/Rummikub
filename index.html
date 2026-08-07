@@ -281,6 +281,12 @@ button, .step-btn, #toggleTimerBtn, #restartTimerBtn, .timer-presets button, sel
 .history-players { display:flex; flex-wrap:wrap; gap:.5rem; font-size:.82rem; color:var(--color-text-muted); }
 .history-player { padding:.15rem .5rem; border-radius:var(--radius-full); background:var(--color-surface-offset); }
 .history-winner { color:var(--color-success); font-weight:600; }
+
+.confetti-canvas { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; z-index:120; }
+.score-edit-input { width:100%; min-width:3.5rem; padding:.2rem .35rem; border:1px solid var(--color-primary); border-radius:var(--radius-sm); background:var(--color-surface); color:var(--color-text); text-align:center; }
+#scoreTable td.editable-cell { cursor:pointer; }
+#scoreTable td.editable-cell:hover { background:var(--color-surface-offset); }
+
 </style>
 </head>
 <body>
@@ -417,6 +423,8 @@ button, .step-btn, #toggleTimerBtn, #restartTimerBtn, .timer-presets button, sel
       Back to Scoring
     </button>
   </div>
+
+  <canvas id="confettiCanvas" class="confetti-canvas" aria-hidden="true"></canvas>
 
   <p class="footer-note">Winner scores the sum of every other player's remaining tile points. Everyone else scores negative their own leftover tiles. Tap the timer button once to start, tap again to stop and reset.</p>
 </div>
@@ -572,6 +580,7 @@ function finishGame() {
   if (confirm('Finish this game and save it to history?')) {
     recordGameToHistory(players[winnerIdx].name, totals[winnerIdx]);
     haptic('success');
+    celebrateWin();
     clearSavedState();
     rounds = [];
     renderRoundEntry();
@@ -774,7 +783,7 @@ function renderTable() {
     order.forEach((idx) => {
       const score = rs[idx];
       const cls = score > 0 ? 'pos' : (score < 0 ? 'neg' : '');
-      row += `<td class="${cls}">${score > 0 ? '+' + score : score}</td>`;
+      row += `<td class="${cls} editable-cell" onclick="startEditScore(${r}, ${idx}, this)">${score > 0 ? '+' + score : score}</td>`;
     });
     row += '</tr>';
     scoreBody.innerHTML += row;
@@ -801,7 +810,7 @@ function renderTotals(order, totals) {
   const target = parseInt(document.getElementById('targetScore').value);
   if (target && rounds.length > 0 && maxTotal >= target) {
     const winnerIdx = totals.indexOf(maxTotal);
-    setTimeout(() => alert(`${players[winnerIdx].name} reached ${maxTotal} points and wins the game!`), 100);
+    setTimeout(() => { celebrateWin(); alert(`${players[winnerIdx].name} reached ${maxTotal} points and wins the game!`); }, 100);
   }
   saveGameState();
 }
@@ -1053,6 +1062,90 @@ function restartTimer() {
 
 function stopAndResetTimerWithSound() {
   stopAndResetTimer();
+}
+
+
+let editingCell = null;
+
+function startEditScore(roundIdx, playerIdx, cell) {
+  if (editingCell) return;
+  editingCell = { roundIdx, playerIdx, cell, oldValue: rounds[roundIdx][playerIdx] };
+  const current = rounds[roundIdx][playerIdx];
+  cell.innerHTML = `<input class="score-edit-input" type="number" value="${current}" inputmode="numeric">`;
+  const input = cell.querySelector('input');
+  input.focus();
+  input.select();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') commitEditScore();
+    if (e.key === 'Escape') cancelEditScore();
+  });
+  input.addEventListener('blur', () => commitEditScore());
+}
+
+function commitEditScore() {
+  if (!editingCell) return;
+  const { roundIdx, playerIdx, cell, oldValue } = editingCell;
+  const input = cell.querySelector('input');
+  if (!input) { editingCell = null; return; }
+  const next = parseInt(input.value);
+  if (isNaN(next)) {
+    rounds[roundIdx][playerIdx] = oldValue;
+  } else {
+    rounds[roundIdx][playerIdx] = next;
+  }
+  editingCell = null;
+  renderTable();
+  saveGameState();
+}
+
+function cancelEditScore() {
+  if (!editingCell) return;
+  editingCell = null;
+  renderTable();
+}
+
+function celebrateWin() {
+  const canvas = document.getElementById('confettiCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.floor(window.innerWidth * dpr);
+  canvas.height = Math.floor(window.innerHeight * dpr);
+  canvas.style.width = window.innerWidth + 'px';
+  canvas.style.height = window.innerHeight + 'px';
+  ctx.scale(dpr, dpr);
+  const colors = ['#e74c3c','#3498db','#f1c40f','#2ecc71','#9b59b6'];
+  const pieces = Array.from({length: 140}, () => ({
+    x: Math.random() * window.innerWidth,
+    y: -20 - Math.random() * window.innerHeight * 0.3,
+    w: 6 + Math.random() * 8,
+    h: 8 + Math.random() * 10,
+    vx: -2 + Math.random() * 4,
+    vy: 2 + Math.random() * 4,
+    rot: Math.random() * Math.PI,
+    vr: -0.15 + Math.random() * 0.3,
+    color: colors[Math.floor(Math.random() * colors.length)]
+  }));
+  const start = performance.now();
+  function frame(now) {
+    const elapsed = now - start;
+    ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    pieces.forEach(p => {
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.03;
+      p.rot += p.vr;
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.rot);
+      ctx.fillStyle = p.color;
+      ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
+      ctx.restore();
+    });
+    if (elapsed < 2200) requestAnimationFrame(frame);
+    else ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+  requestAnimationFrame(frame);
 }
 
 (function initGame() {

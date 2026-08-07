@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rummikub-scorekeeper-v5';
+const CACHE_NAME = 'rummikub-scorekeeper-v6';
 const ASSETS = [
   './index.html',
   './manifest.webmanifest',

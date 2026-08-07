@@ -738,19 +738,35 @@ function submitRound() {
     }
   }
 
+  const missingNames = [];
+  players.forEach((p, idx) => {
+    if (idx !== winnerIdx) {
+      const raw = document.getElementById(`tiles-${idx}`).value;
+      if (raw === '' || raw === null) missingNames.push(p.name);
+    }
+  });
+  if (missingNames.length > 0) {
+    haptic('heavy');
+    alert('Missing tile score for: ' + missingNames.join(', ') + '.\n\nEvery player except the winner must have a tile count entered (0 or more).');
+    return;
+  }
+
   const roundScores = new Array(players.length).fill(0);
-  let winnerTotal = 0, valid = true;
+  let winnerTotal = 0, valid = true, invalidNames = [];
 
   players.forEach((p, idx) => {
     if (idx !== winnerIdx) {
       const raw = document.getElementById(`tiles-${idx}`).value;
-      const tileVal = raw === '' ? 0 : parseInt(raw);
-      if (isNaN(tileVal) || tileVal < 0) { valid = false; return; }
+      const tileVal = parseInt(raw);
+      if (isNaN(tileVal) || tileVal < 0) { valid = false; invalidNames.push(p.name); return; }
       roundScores[idx] = -tileVal;
       winnerTotal += tileVal;
     }
   });
-  if (!valid) { alert('Enter valid non-negative tile totals for every other player.'); return; }
+  if (!valid) {
+    alert('Enter a valid non-negative tile total for: ' + invalidNames.join(', ') + '.');
+    return;
+  }
 
   roundScores[winnerIdx] = winnerTotal;
   rounds.push(roundScores);
@@ -1115,34 +1131,48 @@ function celebrateWin() {
   canvas.style.height = window.innerHeight + 'px';
   ctx.scale(dpr, dpr);
   const colors = ['#e74c3c','#3498db','#f1c40f','#2ecc71','#9b59b6'];
-  const pieces = Array.from({length: 140}, () => ({
+  const screenH = window.innerHeight;
+  const pieces = Array.from({length: 180}, () => ({
     x: Math.random() * window.innerWidth,
-    y: -20 - Math.random() * window.innerHeight * 0.3,
+    y: -20 - Math.random() * screenH * 0.4,
     w: 6 + Math.random() * 8,
     h: 8 + Math.random() * 10,
-    vx: -2 + Math.random() * 4,
-    vy: 2 + Math.random() * 4,
+    vx: -1.5 + Math.random() * 3,
+    vy: 1.5 + Math.random() * 2.5,
     rot: Math.random() * Math.PI,
-    vr: -0.15 + Math.random() * 0.3,
-    color: colors[Math.floor(Math.random() * colors.length)]
+    vr: -0.12 + Math.random() * 0.24,
+    color: colors[Math.floor(Math.random() * colors.length)],
+    settled: false,
+    settleY: screenH - 10 - Math.random() * 30,
+    driftPhase: Math.random() * Math.PI * 2
   }));
   const start = performance.now();
+  const duration = 6500;
   function frame(now) {
     const elapsed = now - start;
     ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+    const fadeStart = duration - 900;
+    const fadeOut = elapsed > fadeStart ? Math.max(0, 1 - (elapsed - fadeStart) / 900) : 1;
     pieces.forEach(p => {
-      p.x += p.vx;
-      p.y += p.vy;
-      p.vy += 0.03;
-      p.rot += p.vr;
+      if (!p.settled) {
+        p.x += p.vx + Math.sin(elapsed / 400 + p.driftPhase) * 0.4;
+        p.y += p.vy;
+        p.vy = Math.min(p.vy + 0.025, 3.2);
+        p.rot += p.vr;
+        if (p.y >= p.settleY) { p.y = p.settleY; p.settled = true; }
+      } else {
+        p.x += Math.sin(elapsed / 600 + p.driftPhase) * 0.15;
+        p.rot += p.vr * 0.2;
+      }
       ctx.save();
+      ctx.globalAlpha = fadeOut;
       ctx.translate(p.x, p.y);
       ctx.rotate(p.rot);
       ctx.fillStyle = p.color;
       ctx.fillRect(-p.w/2, -p.h/2, p.w, p.h);
       ctx.restore();
     });
-    if (elapsed < 2200) requestAnimationFrame(frame);
+    if (elapsed < duration) requestAnimationFrame(frame);
     else ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
   }
   requestAnimationFrame(frame);

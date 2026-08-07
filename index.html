@@ -738,39 +738,34 @@ function submitRound() {
     }
   }
 
-  const missingNames = [];
+  const missingNames = [], invalidNames = [], zeroNames = [];
+  const roundScores = new Array(players.length).fill(0);
+  let winnerTotal = 0;
+
   players.forEach((p, idx) => {
-    if (idx !== winnerIdx) {
-      const raw = document.getElementById(`tiles-${idx}`).value;
-      if (raw === '' || raw === null) missingNames.push(p.name);
-    }
+    if (idx === winnerIdx) return;
+    const raw = document.getElementById(`tiles-${idx}`).value;
+    if (raw === '' || raw === null) { missingNames.push(p.name); return; }
+    const tileVal = parseInt(raw);
+    if (isNaN(tileVal) || tileVal < 0) { invalidNames.push(p.name); return; }
+    if (tileVal === 0) { zeroNames.push(p.name); return; }
+    roundScores[idx] = -tileVal;
+    winnerTotal += tileVal;
   });
+
   if (missingNames.length > 0) {
     haptic('heavy');
-    alert('Missing tile score for: ' + missingNames.join(', ') + '.\n\nEvery player except the winner must have a tile count entered (0 or more).');
+    alert('Missing tile score for: ' + missingNames.join(', ') + '.\n\nEvery player except the winner must have a tile count of 1 or higher entered.');
     return;
   }
-
-  const roundScores = new Array(players.length).fill(0);
-  let winnerTotal = 0, valid = true, invalidNames = [], zeroNames = [];
-
-  players.forEach((p, idx) => {
-    if (idx !== winnerIdx) {
-      const raw = document.getElementById(`tiles-${idx}`).value;
-      const tileVal = parseInt(raw);
-      if (isNaN(tileVal) || tileVal < 0) { valid = false; invalidNames.push(p.name); return; }
-      if (tileVal === 0) { zeroNames.push(p.name); return; }
-      roundScores[idx] = -tileVal;
-      winnerTotal += tileVal;
-    }
-  });
-  if (!valid) {
-    alert('Enter a valid non-negative tile total for: ' + invalidNames.join(', ') + '.');
+  if (invalidNames.length > 0) {
+    haptic('heavy');
+    alert('Enter a valid tile total (1 or higher) for: ' + invalidNames.join(', ') + '.');
     return;
   }
   if (zeroNames.length > 0) {
     haptic('heavy');
-    alert((zeroNames.length > 1 ? 'These players' : 'This player') + ' show 0 tiles left: ' + zeroNames.join(', ') + '.\n\nOnly the round winner can have 0 tiles. If ' + (zeroNames.length > 1 ? 'one of them' : zeroNames[0]) + ' actually won, select them as the winner instead.');
+    alert((zeroNames.length > 1 ? 'These players' : 'This player') + ' show 0 tiles left: ' + zeroNames.join(', ') + '.\n\nOnly the round winner can have 0 tiles. Scores for every other player must be 1 or higher. If ' + (zeroNames.length > 1 ? 'one of them' : zeroNames[0]) + ' actually won, select them as the winner instead.');
     return;
   }
 

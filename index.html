@@ -49,6 +49,31 @@
   --shadow-md:0 4px 12px oklch(0 0 0/0.3);
   --shadow-lg:0 12px 32px oklch(0 0 0/0.4);
 }
+[data-theme="blue"] {
+  --color-bg:#0c2340; --color-surface:#123258; --color-surface-2:#163b66;
+  --color-surface-offset:#0f2c4d; --color-surface-offset-2:#0a1f38;
+  --color-divider:#2a4a72; --color-border:#3a5d8a;
+  --color-text:#eaf1fb; --color-text-muted:#9fb8d9; --color-text-faint:#6f89ac; --color-text-inverse:#0c2340;
+  --color-primary:#e8b64a; --color-primary-hover:#f0c866; --color-primary-active:#d1a03c; --color-primary-highlight:#4a3a1e;
+  --color-error:#e0567a; --color-error-highlight:#4a2530;
+  --color-success:#5fc27a; --color-success-highlight:#1f3e2a;
+  --shadow-sm:0 1px 2px oklch(0 0 0/0.25);
+  --shadow-md:0 4px 12px oklch(0 0 0/0.35);
+  --shadow-lg:0 12px 32px oklch(0 0 0/0.45);
+}
+[data-theme="red"] {
+  --color-bg:#3d0f0f; --color-surface:#4d1414; --color-surface-2:#571818;
+  --color-surface-offset:#451212; --color-surface-offset-2:#360d0d;
+  --color-divider:#6b2626; --color-border:#7d3030;
+  --color-text:#fbeaea; --color-text-muted:#d9a3a3; --color-text-faint:#ac6f6f; --color-text-inverse:#3d0f0f;
+  --color-primary:#e8b64a; --color-primary-hover:#f0c866; --color-primary-active:#d1a03c; --color-primary-highlight:#4a3a1e;
+  --color-error:#f0567a; --color-error-highlight:#4a2530;
+  --color-success:#6fc98a; --color-success-highlight:#1f3e2a;
+  --shadow-sm:0 1px 2px oklch(0 0 0/0.25);
+  --shadow-md:0 4px 12px oklch(0 0 0/0.35);
+  --shadow-lg:0 12px 32px oklch(0 0 0/0.45);
+}
+
 * { box-sizing:border-box; margin:0; padding:0; }
 html { -webkit-text-size-adjust:none; scroll-behavior:smooth; }
 body {
@@ -61,12 +86,13 @@ header.top { display:flex; align-items:center; justify-content:space-between; ma
 .brand { display:flex; align-items:center; gap:.6rem; }
 .brand svg { width:32px; height:32px; color:var(--color-primary); }
 .brand h1 { font-family:var(--font-display), serif; font-weight:700; font-size:clamp(1.25rem,1.1rem + 0.6vw,1.75rem); letter-spacing:-0.01em; }
-#themeToggle, #layoutToggle {
+#themeToggle, #layoutToggle, #soundToggle {
   width:40px; height:40px; border-radius:var(--radius-full); background:var(--color-surface-offset);
   display:flex; align-items:center; justify-content:center; color:var(--color-text); border:1px solid var(--color-border);
 }
+#soundToggle.sound-off { background:var(--color-error-highlight); color:var(--color-error); border-color:var(--color-error); }
 #layoutToggle.active { background:var(--color-primary); color:#fff; border-color:var(--color-primary); }
-#themeToggle svg, #layoutToggle svg { width:18px; height:18px; }
+#themeToggle svg, #layoutToggle svg, #soundToggle svg { width:18px; height:18px; }
 
 .card { background:var(--color-surface); border:1px solid var(--color-border); border-radius:var(--radius-lg); padding:1.25rem; margin-bottom:1.25rem; box-shadow:var(--shadow-sm); }
 .card h2 { font-family:var(--font-display), serif; font-size:clamp(1.05rem,1rem + 0.3vw,1.3rem); margin-bottom:.9rem; }
@@ -433,11 +459,28 @@ function updateSoundToggleIcon() {
 (function(){
   const toggle = document.getElementById('themeToggle');
   const root = document.documentElement;
-  let dark = matchMedia('(prefers-color-scheme:dark)').matches;
-  root.setAttribute('data-theme', dark ? 'dark' : 'light');
+  const THEME_KEY = 'rummikub_theme_pref';
+  const themes = ['light', 'dark', 'blue', 'red'];
+  const icons = {
+    light: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>',
+    dark: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>',
+    blue: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>',
+    red: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="9"/></svg>'
+  };
+  function applyTheme(t) {
+    root.setAttribute('data-theme', t);
+    toggle.innerHTML = icons[t];
+    toggle.style.color = (t === 'blue') ? '#e8b64a' : (t === 'red') ? '#e8b64a' : '';
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+  }
+  let saved = null;
+  try { saved = localStorage.getItem(THEME_KEY); } catch (e) {}
+  let current = themes.includes(saved) ? saved : (matchMedia('(prefers-color-scheme:dark)').matches ? 'dark' : 'light');
+  applyTheme(current);
   toggle.addEventListener('click', () => {
-    dark = !dark;
-    root.setAttribute('data-theme', dark ? 'dark' : 'light');
+    const idx = themes.indexOf(current);
+    current = themes[(idx + 1) % themes.length];
+    applyTheme(current);
   });
 })();
 

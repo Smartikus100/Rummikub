@@ -752,19 +752,25 @@ function submitRound() {
   }
 
   const roundScores = new Array(players.length).fill(0);
-  let winnerTotal = 0, valid = true, invalidNames = [];
+  let winnerTotal = 0, valid = true, invalidNames = [], zeroNames = [];
 
   players.forEach((p, idx) => {
     if (idx !== winnerIdx) {
       const raw = document.getElementById(`tiles-${idx}`).value;
       const tileVal = parseInt(raw);
       if (isNaN(tileVal) || tileVal < 0) { valid = false; invalidNames.push(p.name); return; }
+      if (tileVal === 0) { zeroNames.push(p.name); return; }
       roundScores[idx] = -tileVal;
       winnerTotal += tileVal;
     }
   });
   if (!valid) {
     alert('Enter a valid non-negative tile total for: ' + invalidNames.join(', ') + '.');
+    return;
+  }
+  if (zeroNames.length > 0) {
+    haptic('heavy');
+    alert((zeroNames.length > 1 ? 'These players' : 'This player') + ' show 0 tiles left: ' + zeroNames.join(', ') + '.\n\nOnly the round winner can have 0 tiles. If ' + (zeroNames.length > 1 ? 'one of them' : zeroNames[0]) + ' actually won, select them as the winner instead.');
     return;
   }
 
